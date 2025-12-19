@@ -4,3 +4,20 @@
 *.ptx
 *.cubin
 *.fatbin
+
+# project
+.git
+.venv
+.gitignore
+.python-version
+pyproject.toml
+uv.lock
+
+# personal
+notes.txt
+slurm_commands
+src/test.ipynb
+old_output
+
+# not ready
+experiments/*
