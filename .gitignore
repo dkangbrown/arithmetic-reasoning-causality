@@ -20,4 +20,11 @@ src/test.ipynb
 old_output
 
 # not ready
-experiments/*
+*.csv
+experiments/attention
+experiments/confidence
+experiments/DAS
+experiments/steering_vector
+old_output
+src/test.ipynb
+src/R1_test.ipynb

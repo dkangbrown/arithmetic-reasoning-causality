@@ -29,21 +29,51 @@ stepwise_prompt_components = {
     "stepwise_reasoning_suffix": ". So the sum is {sum}. In final, output only \"{sum}\"."
 }
 
-stepwise_intervene_loc_3_digit = {
-    "all": list(range(5,28)),
-    "user_question": [5,6],
-    "restatement": [7,8,9,10],
-    "reasoning": range(11,26),
-    "result": [26,27],
-    "copy": [7,8,9,10,11,12,13,17,20,23],
-    "intermediate_sums": [19,22,25],
-}
-
-prompt_components = {
+prompt_components_OSS = {
     "system": "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2025-06-28\n\nReasoning: high\n=\n# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|>",
     "user": "<|start|>user<|message|>What is {num1}+{num2}?<|end|>",
     "analysis_prefix": "<|start|>assistant<|channel|>analysis<|message|>",
     "output_prefix": "<|end|><|start|>assistant<|channel|>final<|message|>",
     **column_prompt_components,
     **stepwise_prompt_components,
+}
+
+prompt_components_R1 = {
+    "user": '''<｜begin▁of▁sentence｜><｜User｜>What is {num1}+{num2}? Do not tell me how to do it, just give me the answer. For example, "The answer is 397".<｜Assistant｜><think>''',
+    "restatement": "\nI need to add {num1} and {num2}.",
+    "reasoning": "\n\nFirst, I'll add the units place: {units1} plus {units2} equals {units_sum}.\n\nNext, I'll add the tens place: {tens1} plus {tens2} equals {tens_sum}.\n\nThen, I'll add the hundreds place: {hundreds1} plus {hundreds2} equals {hundreds_sum}.",
+    "result": "\n\nCombining these results, the total is {sum}.",
+    "output_prefix": "\n</think>\n\nThe answer is \\boxed{",
+}
+
+intervene_ids_stepwise_3_digit = {
+    "all": list(range(7,28)),
+    "restatement": [7,8,9,10,11,12,13],
+    "reasoning": [14,15,16,17,18,19,20,21,22,23,24,25],
+    "result": [26,27],
+    "copy": [7,8,9,10,11,12,13,17,18,20,21,23,24,26,27],
+    "scale": [14,15,16],
+    "reasoning_copy": [17,18,20,21,23,24],
+    "intermediate_sums": [19,22,25],
+}
+
+intervene_ids_stepwise_3_digit_h = {
+    "all": [8,10,12,14,18,19,20,22,23,25,26,27],
+    "restatement": [8,10,12],
+    "reasoning": [14,18,19,20,22,23,25],
+    "result": [26,27],
+}
+
+intervene_ids_R1_3_digit = {
+    "all": [3,4,5,6,7,8,9,10,11,12,13,14],
+    "restatement": [3,4],
+    "reasoning": [5,6,7,8,9,10,11,12,13],
+    "result": [14],
+}
+
+intervene_ids_R1_3_digit_h = {
+    "all": [4,12,13,14],
+    "restatement": [4],
+    "reasoning": [12,13],
+    "result": [14],
 }
