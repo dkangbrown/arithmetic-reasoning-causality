@@ -30,7 +30,7 @@ stepwise_prompt_components = {
 }
 
 prompt_components_OSS = {
-    "system": "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2025-06-28\n\nReasoning: high\n=\n# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|>",
+    "system": "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2025-06-28\n\nReasoning: high\n\n# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|>",
     "user": "<|start|>user<|message|>What is {num1}+{num2}?<|end|>",
     "analysis_prefix": "<|start|>assistant<|channel|>analysis<|message|>",
     "output_prefix": "<|end|><|start|>assistant<|channel|>final<|message|>",

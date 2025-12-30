@@ -3,9 +3,10 @@ import pandas as pd
 import _util
 import _mapping
 
-def get_accuracy(filepath):
+def get_accuracy(filepath, output_type="immediate"):
     # Read the CSV file
     df = pd.read_csv(filepath)
+    df['generated_text'] = df['generated_text'].astype(str)
 
     # Initialize a list to store correctness results
     factual_results = []
@@ -19,7 +20,7 @@ def get_accuracy(filepath):
             source_sum = row['source_sum']
             
             # Get the generated output from generated_text
-            generated_output = _util.get_final_output(row['generated_text'])
+            generated_output = _util.get_final_output(row['generated_text'], output_type=output_type)
             
             # Check if they match
             is_factual = str(base_sum) == str(generated_output)
@@ -49,9 +50,7 @@ def get_accuracy(filepath):
 
     return df
 
-def plot_intervention_success_rate_by_location(df):
-    # Load intervention location types
-    intervention_location_type = _mapping.stepwise_intervene_loc_3_digit
+def plot_intervention_success_rate_by_location(df, intervene_ids_dict=_mapping.intervene_ids_stepwise_3_digit):
     
     # Create single plot for intervention success rate
     plt.figure(figsize=(10, 6))
@@ -63,31 +62,38 @@ def plot_intervention_success_rate_by_location(df):
     # Define colors for different intervention types
     colors = []
     for intervention_id in success_ratios.index:
-        if intervention_id in intervention_location_type["restatement"]:
+        if intervention_id in intervene_ids_dict["restatement"]:
             colors.append('red')
+        elif intervention_id in intervene_ids_dict["reasoning"]:
+            colors.append('blue')
+        elif intervention_id in intervene_ids_dict["result"]:
+            colors.append('orange')
+        else:
+            colors.append('gray')
         # elif intervention_id in intervention_location_type["reasoning_copy"]:
         #     colors.append('blue')
         # elif intervention_id in intervention_location_type["scale"]:
         #     colors.append('purple')
         # elif intervention_id in intervention_location_type["intermediate_sums"]:
         #     colors.append('green')
-        if intervention_id in intervention_location_type["reasoning"]:
-            colors.append('blue')
-        elif intervention_id in intervention_location_type["result"]:
-            colors.append('yellow')
-        else:
-            colors.append('gray')
     
-    plt.bar(success_ratios.index, success_ratios.values, color=colors, alpha=0.7)
-    plt.title('Intervention Success Rate by Intervention ID')
-    plt.xlabel('Intervention ID')
-    plt.ylabel('Intervention Success Rate (%)')
-    plt.ylim(0, 100)
+    # Create bar positions and labels
+    x_positions = range(len(success_ratios))
+    x_labels = [str(idx) for idx in success_ratios.index]
+    
+    plt.bar(x_positions, success_ratios.values, color=colors, alpha=0.7)
+    plt.title('Intervention Success Rate by Intervention ID', fontsize=16)
+    plt.xlabel('Intervention ID', fontsize=14)
+    plt.ylabel('Intervention Success Rate (%)', fontsize=14)
+    plt.ylim(0, 105)
     plt.grid(True, alpha=0.3)
+    
+    # Set x-axis ticks and labels
+    plt.xticks(x_positions, x_labels)
     
     # Add value labels on bars
     for i, v in enumerate(success_ratios.values):
-        plt.text(success_ratios.index[i], v + 1, f'{v:.1f}%', ha='center', va='bottom')
+        plt.text(i, v + 1, f'{v:.1f}%', ha='center', va='bottom')
     
     # Create legend
     from matplotlib.patches import Patch
@@ -100,7 +106,7 @@ def plot_intervention_success_rate_by_location(df):
         Patch(facecolor='orange', alpha=0.7, label='Result'),
         Patch(facecolor='gray', alpha=0.7, label='Other')
     ]
-    plt.legend(handles=legend_elements, loc='upper right')
+    plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
     
     plt.tight_layout()
     plt.show()
@@ -119,30 +125,46 @@ def plot_intervention_results_by_location(df):
     # Plot 1: Factual accuracy by intervention_id
     plt.subplot(1, 2, 1)
     factual_ratios = df.groupby('intervention_id')['is_factual'].mean() * 100
-    plt.bar(factual_ratios.index, factual_ratios.values, color='blue', alpha=0.7)
+    
+    # Create bar positions and labels for only existing indices
+    x_positions = range(len(factual_ratios))
+    x_labels = [str(idx) for idx in factual_ratios.index]
+    
+    plt.bar(x_positions, factual_ratios.values, color='blue', alpha=0.7)
     plt.title('Factual Accuracy by Intervention ID')
     plt.xlabel('Intervention ID')
     plt.ylabel('Factual Accuracy (%)')
-    plt.ylim(0, 100)
+    plt.ylim(0, 105)
     plt.grid(True, alpha=0.3)
+    
+    # Set x-axis ticks and labels
+    plt.xticks(x_positions, x_labels)
     
     # Add value labels on bars
     for i, v in enumerate(factual_ratios.values):
-        plt.text(factual_ratios.index[i], v + 1, f'{v:.1f}%', ha='center', va='bottom')
+        plt.text(i, v + 1, f'{v:.0f}%', ha='center', va='bottom')
     
     # Plot 2: Counterfactual accuracy by intervention_id
     plt.subplot(1, 2, 2)
     counterfactual_ratios = df.groupby('intervention_id')['is_counterfactual'].mean() * 100
-    plt.bar(counterfactual_ratios.index, counterfactual_ratios.values, color='red', alpha=0.7)
+    
+    # Create bar positions and labels for only existing indices
+    x_positions = range(len(counterfactual_ratios))
+    x_labels = [str(idx) for idx in counterfactual_ratios.index]
+    
+    plt.bar(x_positions, counterfactual_ratios.values, color='red', alpha=0.7)
     plt.title('Counterfactual Accuracy by Intervention ID')
     plt.xlabel('Intervention ID')
     plt.ylabel('Counterfactual Accuracy (%)')
-    plt.ylim(0, 100)
+    plt.ylim(0, 105)
     plt.grid(True, alpha=0.3)
+    
+    # Set x-axis ticks and labels
+    plt.xticks(x_positions, x_labels)
     
     # Add value labels on bars
     for i, v in enumerate(counterfactual_ratios.values):
-        plt.text(counterfactual_ratios.index[i], v + 1, f'{v:.1f}%', ha='center', va='bottom')
+        plt.text(i, v + 1, f'{v:.0f}%', ha='center', va='bottom')
     
     plt.tight_layout()
     plt.show()
@@ -283,3 +305,101 @@ def plot_probability_distributions(probability_filepath):
     plt.show()
 
     
+def has_wait(generated_text):
+    return "?" in generated_text.lower()
+
+def has_wait_before_answer(generated_text, answer):
+    if answer in generated_text:
+        if generated_text.split(answer)[0].lower().count("?") == 0:
+            return 0
+        else:
+            return 1
+    else:
+        return 2
+
+def plot_wait_ratio(df, filter_columns=['in_restatement', 'in_reasoning', 'in_result']):
+
+    # Add wait analysis columns to accuracy_results
+    df['has_wait'] = df['generated_text'].apply(has_wait)
+    df['has_wait_before_answer'] = df.apply(
+        lambda row: has_wait_before_answer(row['generated_text'], str(row['base_sum'])), axis=1
+    )
+
+    # Plot wait analysis
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig.suptitle('Percentage of Responses with "Wait" by Category', fontsize=16)
+
+    # Overall statistics
+    overall_wait_pct = df['has_wait'].mean() * 100
+    overall_wait_before_answer_0_pct = (df['has_wait_before_answer'] == 0).mean() * 100
+    overall_wait_before_answer_1_pct = (df['has_wait_before_answer'] == 1).mean() * 100
+    overall_wait_before_answer_2_pct = (df['has_wait_before_answer'] == 2).mean() * 100
+
+    # Plot overall - has_wait
+    plt.subplot(2, 4, 1)
+    plt.bar(['Has Wait', 'No Wait'], 
+            [overall_wait_pct, 100 - overall_wait_pct], 
+            color=['green', 'gray'], alpha=0.7)
+    plt.title(f'Overall - Has Wait\n(n={len(df)})')
+    plt.ylabel('Percentage (%)')
+    plt.ylim(0, 110)
+    plt.text(0, overall_wait_pct + 2, f'{overall_wait_pct:.1f}%', ha='center')
+    plt.text(1, (100 - overall_wait_pct) + 2, f'{100 - overall_wait_pct:.1f}%', ha='center')
+
+    # Plot overall - has_wait_before_answer
+    plt.subplot(2, 4, 5)
+    plt.bar(['No', 'Yes', 'No Correct Answer'], 
+            [overall_wait_before_answer_0_pct, overall_wait_before_answer_1_pct, overall_wait_before_answer_2_pct], 
+            color=['green', 'gray'], alpha=0.7)
+    plt.title(f'Overall - Wait Before Correct Answer\n(n={len(df)})')
+    plt.ylabel('Percentage (%)')
+    plt.ylim(0, 110)
+    plt.text(0, overall_wait_before_answer_0_pct + 2, f'{overall_wait_before_answer_0_pct:.1f}%', ha='center')
+    plt.text(1, overall_wait_before_answer_1_pct + 2, f'{overall_wait_before_answer_1_pct:.1f}%', ha='center')
+    plt.text(2, overall_wait_before_answer_2_pct + 2, f'{overall_wait_before_answer_2_pct:.1f}%', ha='center')
+
+    # Plot for each filter column
+    for i, col in enumerate(filter_columns):
+        if col in df.columns:
+            filtered_df = df[df[col] == True]
+            if len(filtered_df) > 0:
+                wait_pct = filtered_df['has_wait'].mean() * 100
+                wait_before_answer_0_pct = (filtered_df['has_wait_before_answer'] == 0).mean() * 100
+                wait_before_answer_1_pct = (filtered_df['has_wait_before_answer'] == 1).mean() * 100
+                wait_before_answer_2_pct = (filtered_df['has_wait_before_answer'] == 2).mean() * 100
+                
+                # Plot has_wait
+                plt.subplot(2, 4, i + 2)
+                plt.bar(['Has Wait', 'No Wait'], 
+                        [wait_pct, 100 - wait_pct], 
+                        color=['green', 'gray'], alpha=0.7)
+                plt.title(f'{col} - Has Wait\n(n={len(filtered_df)})')
+                plt.ylabel('Percentage (%)')
+                plt.ylim(0, 110)
+                plt.text(0, wait_pct + 2, f'{wait_pct:.1f}%', ha='center')
+                plt.text(1, (100 - wait_pct) + 2, f'{100 - wait_pct:.1f}%', ha='center')
+                
+                # Plot has_wait_before_answer
+                plt.subplot(2, 4, i + 6)
+                plt.bar(['No', 'Yes', 'No Correct Answer'], 
+                        [wait_before_answer_0_pct, wait_before_answer_1_pct, wait_before_answer_2_pct], 
+                        color=['green', 'gray'], alpha=0.7)
+                plt.title(f'{col} - Wait Before Answer\n(n={len(filtered_df)})')
+                plt.ylabel('Percentage (%)')
+                plt.ylim(0, 110)
+                plt.text(0, wait_before_answer_0_pct + 2, f'{wait_before_answer_0_pct:.1f}%', ha='center')
+                plt.text(1, wait_before_answer_1_pct + 2, f'{wait_before_answer_1_pct:.1f}%', ha='center')
+                plt.text(2, wait_before_answer_2_pct + 2, f'{wait_before_answer_2_pct:.1f}%', ha='center')
+            else:
+                # Plot has_wait - no data
+                plt.subplot(2, 4, i + 2)
+                plt.text(0.5, 0.5, 'No data', ha='center', va='center', transform=plt.gca().transAxes)
+                plt.title(f'{col} - Has Wait\n(n=0)')
+                
+                # Plot has_wait_before_answer - no data
+                plt.subplot(2, 4, i + 6)
+                plt.text(0.5, 0.5, 'No data', ha='center', va='center', transform=plt.gca().transAxes)
+                plt.title(f'{col} - Wait Before Answer\n(n=0)')
+
+    plt.tight_layout()
+    plt.show()

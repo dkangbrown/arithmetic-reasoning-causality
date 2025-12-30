@@ -25,9 +25,8 @@ def load_OSS(model_id="openai/gpt-oss-20b", path="/users/dkang33/scratch/model_c
 def load_R1(model_id="deepseek-ai/DeepSeek-R1-Distill-Llama-8B", path="/users/dkang33/scratch/model_cache", device="auto", dtype=torch.bfloat16):
     model = AutoModelForCausalLM.from_pretrained(model_id, cache_dir=path, dtype=dtype, device_map=device)
     tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=path)
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.pad_token_id = 19742
-    model.config.pad_token_id = 19742
+    tokenizer.pad_token_id = 93
+    model.config.pad_token_id = 93
 
     return model, tokenizer
 
@@ -73,17 +72,37 @@ def lookup_module(model, hook_name):
     d = dict(model.named_modules())
     return d[hook_name] if hook_name in d else None
 
-def get_final_output(generated_text):
+def get_final_output(generated_text, output_type="immediate", intervene_id=None):
     '''
     Get the final output from the generated output.
     '''
-    final_channel = generated_text.split('<|start|>assistant<|channel|>final<|message|>')[-1]
-    # Extract the first occurring number from final_channel
-    numbers = re.findall(r'\d+', final_channel)
-    if numbers:
-        return numbers[0]
+    if output_type == "immediate":
+        numbers = re.findall(r'\d+', generated_text)
+        if numbers:
+            return numbers[0]
+        else:
+            raise ValueError("No number found in the generated text")
+    elif output_type == "final_output":
+        if "<|channel|>final<|message|>" in generated_text:
+            final_channel = generated_text.split('<|start|>assistant<|channel|>final<|message|>')[-1]
+            # Extract the first occurring number from final_channel
+            numbers = re.findall(r'\d+', final_channel)
+            if numbers:
+                return numbers[0]
+            else:
+                raise ValueError("No number found in the final channel")
+        elif "The answer is " in generated_text:
+            answer = generated_text.split("The answer is ")[-1]
+            # Extract the first occurring number from the answer
+            numbers = re.findall(r'\d+', answer)
+            if numbers:
+                return numbers[0]
+            else:
+                raise ValueError("No number found in the answer")
+        else:
+            raise ValueError(f"No final output found in the generated text, for intervene_id: {intervene_id}")
     else:
-        raise ValueError("No number found in the final channel")
+        raise ValueError("Invalid output type")
 
 def print_GPU_availbility():
     print(f"CUDA is available: {torch.cuda.is_available()}")

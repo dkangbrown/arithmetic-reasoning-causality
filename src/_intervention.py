@@ -67,7 +67,7 @@ def get_batch_intervene_hook(activation):
         return input
     return intervene_hook
 
-def get_batch_token_intervene_hook(activations, tok_locs, num_toks=2):
+def get_batch_token_intervene_hook(activations, tok_locs, num_toks=1):
     assert len(activations) == len(tok_locs)
     def intervene_hook(module, input):
         """
@@ -83,6 +83,20 @@ def get_batch_token_intervene_hook(activations, tok_locs, num_toks=2):
         return input
     return intervene_hook
 
+def get_batch_multitoken_intervene_hook(activation, tok_pos_list):
+    def intervene_hook(module, input):
+        """
+        A forward pre-hook function to inspect and modify the input arguments.
+        `module`: The module to which the hook is attached.
+        `args`: A tuple containing the input tensors for the module's forward method.
+        
+        Returns:
+            Modified input for the module's forward pass.
+        """
+        input[0][:, tok_pos_list] = activation[:, tok_pos_list]
+        return input
+    return intervene_hook
+
 def get_attention_freeze_hooks(model, tokens):
     module_names = [f"model.layers.{i}.self_attn.q_proj" for i in range(len(model.model.layers))]\
                  + [f"model.layers.{i}.self_attn.k_proj" for i in range(len(model.model.layers))]
@@ -94,21 +108,21 @@ def get_attention_freeze_hooks(model, tokens):
         hooks.append(hook)
     return hooks
 
-def prepare_batch_token_intervention(model, tokenizer, layer, base_before, base_number, base_after, source_before, source_number, module_format="model.layers.{layer}", num_toks=2):
+def prepare_batch_token_intervention(model, tokenizer, layer, base_before, base_number, base_after, source_before, source_number, module_format="model.layers.{layer}", num_toks=1):
     """
     Prepare the batch for token activation intervention.
     """
     source = [source_before[i] + str(source_number[i]) for i in range(len(source_before))]
-    source_tokens = tokenizer(source, return_tensors="pt", padding=True, padding_side="left").to(model.device)
+    source_tokens = tokenizer(source, add_special_tokens=False, return_tensors="pt", padding=True, padding_side="left").to(model.device)
     _, cache = forward_with_cache(model, source_tokens["input_ids"], attention_mask=source_tokens["attention_mask"])
     activations = list(cache[f"model.layers.{layer}"][:,-num_toks:,:])
 
     offsets = []
     for after in base_after:
-        offsets.append(len(tokenizer(after, return_tensors="pt")["input_ids"][0]))
+        offsets.append(len(tokenizer(after, add_special_tokens=False, return_tensors="pt")["input_ids"][0]))
 
     base = [base_before[i] + str(base_number[i]) + base_after[i] for i in range(len(base_before))]
-    tokens = tokenizer(base, return_tensors="pt", padding=True, padding_side="left").to(model.device)
+    tokens = tokenizer(base, add_special_tokens=False, return_tensors="pt", padding=True, padding_side="left").to(model.device)
     seq_len = tokens["input_ids"].shape[1]
     tok_locs = [seq_len - offset - 1 for offset in offsets]
 
@@ -118,6 +132,27 @@ def prepare_batch_token_intervention(model, tokenizer, layer, base_before, base_
     torch.cuda.empty_cache()
     gc.collect()
     return tokens, hook
+
+def prepare_batch_multitoken_intervention(model, tokenizer, layer, tok_pos_list, base_prompts, source_prompts, module_format="model.layers.{layer}"):
+    """
+    Prepare the batch for token activation intervention.
+    """
+    base_tokens = tokenizer(base_prompts, add_special_tokens=False, return_tensors="pt", padding=True, padding_side="left").to(model.device)
+    source_tokens = tokenizer(source_prompts, add_special_tokens=False, return_tensors="pt", padding=True, padding_side="left").to(model.device)
+    # print(tokenizer.convert_ids_to_tokens(base_tokens["input_ids"][0])[112])
+    # print(tokenizer.convert_ids_to_tokens(source_tokens["input_ids"][0])[112])
+    # print(tokenizer.convert_ids_to_tokens(base_tokens["input_ids"][0])[202])
+    # print(tokenizer.convert_ids_to_tokens(source_tokens["input_ids"][0])[202])
+    # print(tokenizer.convert_ids_to_tokens(base_tokens["input_ids"][0])[212])
+    # print(tokenizer.convert_ids_to_tokens(source_tokens["input_ids"][0])[212])
+    _, cache = forward_with_cache(model, source_tokens["input_ids"], attention_mask=source_tokens["attention_mask"])
+    activation = cache[f"model.layers.{layer}"]
+    hook = {module_format.format(layer=layer): get_batch_multitoken_intervene_hook(activation, tok_pos_list)}
+
+    del cache, activation
+    torch.cuda.empty_cache()
+    gc.collect()
+    return base_tokens, hook
 
 def batch_intervene(model, input_ids, hooks, **kwargs):
     """
