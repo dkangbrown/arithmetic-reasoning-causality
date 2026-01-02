@@ -97,6 +97,20 @@ def get_batch_multitoken_intervene_hook(activation, tok_pos_list):
         return input
     return intervene_hook
 
+def get_batch_multitoken_steer_hook(activation, tok_pos_list):
+    def steer_hook(module, input):
+        """
+        A forward pre-hook function to inspect and modify the input arguments.
+        `module`: The module to which the hook is attached.
+        `args`: A tuple containing the input tensors for the module's forward method.
+        
+        Returns:
+            Modified input for the module's forward pass.
+        """
+        input[0][:, tok_pos_list] += activation[:, tok_pos_list]
+        return input
+    return steer_hook
+
 def get_attention_freeze_hooks(model, tokens):
     module_names = [f"model.layers.{i}.self_attn.q_proj" for i in range(len(model.model.layers))]\
                  + [f"model.layers.{i}.self_attn.k_proj" for i in range(len(model.model.layers))]
@@ -150,6 +164,29 @@ def prepare_batch_multitoken_intervention(model, tokenizer, layer, tok_pos_list,
     hook = {module_format.format(layer=layer): get_batch_multitoken_intervene_hook(activation, tok_pos_list)}
 
     del cache, activation
+    torch.cuda.empty_cache()
+    gc.collect()
+    return base_tokens, source_tokens, hook
+
+def prepare_batch_multitoken_steering(model, tokenizer, layer, tok_pos_list, base_prompts, representation, module_format="model.layers.{layer}"):
+    """
+    Prepare the batch for token activation intervention.
+    """
+    base_tokens = tokenizer(base_prompts, add_special_tokens=False, return_tensors="pt", padding=True, padding_side="left").to(model.device)
+    
+    # Get batch size and sequence length from base_tokens
+    batch_size, seq_len = base_tokens["input_ids"].shape
+    # Expand representation to shape (batch_size, seq_len, representation_dim)
+    if layer < 8:
+        device = "cuda:0"
+    elif layer < 16:
+        device = "cuda:1"
+    else:
+        device = "cuda:4"
+    activation = representation.unsqueeze(0).unsqueeze(0).expand(batch_size, seq_len, -1).to(device)
+    hook = {module_format.format(layer=layer): get_batch_multitoken_steer_hook(activation, tok_pos_list)}
+
+    del activation
     torch.cuda.empty_cache()
     gc.collect()
     return base_tokens, hook
