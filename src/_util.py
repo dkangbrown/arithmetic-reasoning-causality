@@ -88,7 +88,7 @@ def get_final_output(generated_text, output_type="immediate", intervene_id=None)
             # Extract the first occurring number from final_channel
             numbers = re.findall(r'\d+', final_channel)
             if numbers:
-                return numbers[0]
+                return numbers[-1]
             else:
                 raise ValueError("No number found in the final channel")
         elif "The answer is " in generated_text:
@@ -100,7 +100,12 @@ def get_final_output(generated_text, output_type="immediate", intervene_id=None)
             else:
                 raise ValueError("No number found in the answer")
         else:
-            raise ValueError(f"No final output found in the generated text, for intervene_id: {intervene_id}")
+            numbers = re.findall(r'\d+', generated_text)
+            if numbers:
+                return numbers[-1]
+            else:
+                raise ValueError("No number found in the answer")
+            # raise ValueError(f"No final output found in the generated text, for intervene_id: {intervene_id}")
     else:
         raise ValueError("Invalid output type")
 

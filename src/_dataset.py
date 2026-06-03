@@ -199,3 +199,61 @@ def create_h2_dataset(num_digits=3, num_samples=256):
         })
 
     return add_ds
+
+def create_c_dataset(num_digits=3, num_samples=256):
+
+    add_ds = []
+    for _ in range(num_samples):
+        retry = True
+        while retry:
+            if num_digits >= 3:
+                base_1 = [random.randint(1, 9)] + [random.randint(0, 9) for _ in range(num_digits-3)] + [random.randint(1, 9), random.randint(0, 8)]
+            else:
+                base_1 = [random.randint(1, 9), random.randint(0, 8)]
+            base_2 = []
+            for i in range(num_digits):
+                if i == 0:
+                    base_2.append(random.randint(1, 9))
+                elif i == num_digits - 1:
+                    base_2.append(random.choice([x for x in range(0,10) if base_1[i] + x < 10]))
+                elif i == num_digits - 2:
+                    base_2.append(random.choice([x for x in range(0,10) if base_1[i] + x >= 10]))
+                else:
+                    base_2.append(random.choice([x for x in range(0,10) if base_1[i] + x + 1 >= 10]))
+            source_1 = base_1.copy()
+            source_2 = []
+            for i in range(num_digits):
+                if i == num_digits - 1:
+                    source_2.append(random.choice([x for x in range(0,10) if base_1[i] + x < 10 and base_2[i] != x]))
+                else:
+                    source_2.append(base_2[i])
+            
+            base_1_scaled_digits = _prompt.get_scaled_digits(base_1)
+            base_2_scaled_digits = _prompt.get_scaled_digits(base_2)
+            source_1_scaled_digits = _prompt.get_scaled_digits(source_1)
+            source_2_scaled_digits = _prompt.get_scaled_digits(source_2)
+
+            base_1_num = sum(base_1_scaled_digits)
+            base_2_num = sum(base_2_scaled_digits)
+            source_1_num = sum(source_1_scaled_digits)
+            source_2_num = sum(source_2_scaled_digits)
+            
+            base_sum = base_1_num + base_2_num
+            source_sum = source_1_num + source_2_num
+
+            retry = len(str(base_sum)) != num_digits or len(str(source_sum)) != num_digits
+
+        add_ds.append({
+            "base_1_digits": base_1,
+            "base_2_digits": base_2,
+            "base_1_num": base_1_num,
+            "base_2_num": base_2_num,
+            "base_sum": base_sum,
+            "source_1_digits": source_1,
+            "source_2_digits": source_2,
+            "source_1_num": source_1_num,
+            "source_2_num": source_2_num,
+            "source_sum": source_sum,
+        })
+
+    return add_ds

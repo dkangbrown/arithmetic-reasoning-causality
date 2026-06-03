@@ -28,3 +28,6 @@ experiments/steering_vector
 old_output
 src/test.ipynb
 src/R1_test.ipynb
+.env
+__pycache__/
+*.py[cod]

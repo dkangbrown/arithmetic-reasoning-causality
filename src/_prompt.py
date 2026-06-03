@@ -1,5 +1,5 @@
 import re
-from _mapping import prompt_components_OSS, prompt_components_R1
+from _mapping import prompt_components_OSS, prompt_components_R1, digit_num_to_name
 import ast
 
 def get_scaled_digits(digits):
@@ -22,9 +22,44 @@ def get_stepwise_reasoning_steps(num_1_num, num_2_scaled_digits):
 
     return reasoning_steps_concat
 
+def get_column_reasoning_steps(num_1_digits, num_2_digits):
+    reasoning_steps = []
+    num_1_digits = num_1_digits[::-1]
+    num_2_digits = num_2_digits[::-1]
+    prev_carry = False
+    for i, (num_1_digit, num_2_digit) in enumerate(zip(num_1_digits, num_2_digits)):
+        if i == 0:
+            reasoning_step = prompt_components_OSS["column_reasoning_step"].format(digit_name="units", num1_digit=num_1_digit, num2_digit=num_2_digit, digit_sum=num_1_digit + num_2_digit, prev_carry="", write_and_carry=prompt_components_OSS["write_and_carry"].format(write=(num_1_digit + num_2_digit) % 10, carry=1 if (num_1_digit + num_2_digit) >= 10 else 0))
+            if num_1_digit + num_2_digit >= 10:
+                prev_carry = True
+            else:
+                prev_carry = False
+        elif i == len(num_1_digits) - 1:
+            reasoning_step = prompt_components_OSS["column_reasoning_step"].format(digit_name=digit_num_to_name[i+1], num1_digit=num_1_digit, num2_digit=num_2_digit, digit_sum=num_1_digit + num_2_digit, prev_carry=prompt_components_OSS["prev_carry"].format(digit_sum=num_1_digit + num_2_digit + 1) if prev_carry else "", write_and_carry="")
+            if num_1_digit + num_2_digit >= 10:
+                prev_carry = True
+            else:
+                prev_carry = False
+        else:
+            reasoning_step = prompt_components_OSS["column_reasoning_step"].format(digit_name=digit_num_to_name[i+1], num1_digit=num_1_digit, num2_digit=num_2_digit, digit_sum=num_1_digit + num_2_digit, prev_carry=prompt_components_OSS["prev_carry"].format(digit_sum=num_1_digit + num_2_digit + 1) if prev_carry else "", write_and_carry=prompt_components_OSS["write_and_carry"].format(write=(num_1_digit + num_2_digit) % 10, carry=1 if (num_1_digit + num_2_digit) >= 10 else 0))
+            if num_1_digit + num_2_digit >= 10:
+                prev_carry = True
+            else:
+                prev_carry = False
+        reasoning_steps.append(reasoning_step)
+    reasoning_steps_concat = ".".join(reasoning_steps) + "."
+
+    return reasoning_steps_concat
+
 def get_stepwise_user_prompt(num1_num, num2_num):
     system_prompt = prompt_components_OSS["system"]
     developer_instructions = prompt_components_OSS["stepwise_developer"]
+    user_prompt = prompt_components_OSS["user"].format(num1=num1_num, num2=num2_num)
+    return system_prompt + developer_instructions + user_prompt
+
+def get_column_user_prompt(num1_num, num2_num):
+    system_prompt = prompt_components_OSS["system"]
+    developer_instructions = prompt_components_OSS["column_developer"]
     user_prompt = prompt_components_OSS["user"].format(num1=num1_num, num2=num2_num)
     return system_prompt + developer_instructions + user_prompt
 
@@ -42,11 +77,32 @@ def get_stepwise_prompt(num_1_digits, num_2_digits, num_1_num, num_2_num):
 
     return user_prompt + analysis_prefix + restatement + reasoning_prefix + reasoning_steps + reasoning_suffix + output_prefix
 
+def get_column_prompt(num_1_digits, num_2_digits, num_1_num, num_2_num):
+
+    user_prompt = get_column_user_prompt(num_1_num, num_2_num)
+    analysis_prefix = prompt_components_OSS["analysis_prefix"]
+    restatement = prompt_components_OSS["column_restatement"].format(num1=num_1_num, num2=num_2_num)
+    reasoning_prefix = prompt_components_OSS["column_reasoning_prefix"]
+    reasoning_steps = get_column_reasoning_steps(num_1_digits, num_2_digits)
+    reasoning_suffix = prompt_components_OSS["column_reasoning_suffix"].format(sum=num_1_num + num_2_num)
+    output_prefix = prompt_components_OSS["output_prefix"]
+
+    return user_prompt + analysis_prefix + restatement + reasoning_prefix + reasoning_steps + reasoning_suffix + output_prefix
+
+def get_vanilla_prompt(num_1_digits, num_2_digits, num_1_num, num_2_num):
+
+    user_prompt = prompt_components_OSS["system"] + prompt_components_OSS["user"].format(num1=num_1_num, num2=num_2_num)
+    analysis_prefix = prompt_components_OSS["analysis_prefix"]
+    reasoning = prompt_components_OSS["vanilla_reasoning"].format(num1=num_1_num, num2=num_2_num, sum=num_1_num + num_2_num)
+    output_prefix = prompt_components_OSS["output_prefix"]
+
+    return user_prompt + analysis_prefix + reasoning + output_prefix
+
 def get_R1_prompt(num_1_digits, num_2_digits, num_1_num, num_2_num):
 
     user_prompt = prompt_components_R1["user"].format(num1=num_1_num, num2=num_2_num)
     restatement = prompt_components_R1["restatement"].format(num1=num_1_num, num2=num_2_num)
-    reasoning = prompt_components_R1["reasoning"].format(units1=num_1_digits[2], units2=num_2_digits[2], units_sum=num_1_digits[2] + num_2_digits[2], tens1=num_1_digits[1], tens2=num_2_digits[1], tens_sum=num_1_digits[1] + num_2_digits[1], hundreds1=num_1_digits[0], hundreds2=num_2_digits[0], hundreds_sum=num_1_digits[0] + num_2_digits[0])
+    reasoning = prompt_components_R1["reasoning"].format(units1=num_1_digits[2], units2=num_2_digits[2], units_sum=num_1_digits[2] + num_2_digits[2], tens1=num_1_digits[1]*10, tens2=num_2_digits[1]*10, tens_sum=num_1_digits[1]*10 + num_2_digits[1]*10, hundreds1=num_1_digits[0]*100, hundreds2=num_2_digits[0]*100, hundreds_sum=num_1_digits[0]*100 + num_2_digits[0]*100)
     result = prompt_components_R1["result"].format(sum=num_1_num + num_2_num)
     output_prefix = prompt_components_R1["output_prefix"]
 
@@ -89,7 +145,7 @@ def get_intervened_prompt(intervention_ids, base_prompt, source_prompt):
 
     return get_intervened_prompt(intervention_ids, base_before, source_before) + source_number + base_after
 
-def get_counterfactual_sum_OSS_3_digit(intervention_id, **row):
+def get_counterfactual_sum_stepwise_3_digit(intervention_id, **row):
     '''
     Get the counterfactual sum for the given intervention id, base 1 number, base 2 digits, and source number.
     Args:
@@ -156,6 +212,49 @@ def get_counterfactual_sum_OSS_3_digit(intervention_id, **row):
     elif intervention_id == 27:
         return source_sum
 
+def get_counterfactual_sum_column_3_digit(intervention_id, **row):
+    '''
+    Get the counterfactual sum for the given intervention id, base 1 number, base 2 digits, and source number.
+    Args:
+        intervention_id: The intervention id.
+        base_1_num: The base 1 number.
+        base_2_digits: The base 2 digits.
+        source_number: The source number.
+    Returns:
+        The counterfactual sum.
+    '''
+
+    return row['source_sum']
+
+    # It suffices for the c prompt
+
+def get_counterfactual_sum_vanilla_2_digit(intervention_id, **row):
+    '''
+    Get the counterfactual sum for the given intervention id, base 1 number, base 2 digits, and source number.
+    Args:
+        intervention_id: The intervention id.
+        base_1_num: The base 1 number.
+        base_2_digits: The base 2 digits.
+        source_number: The source number.
+    Returns:
+        The counterfactual sum.
+    '''
+
+    # Get the base and source numbers
+    base_1_num = row['base_1_num']
+    base_2_num = row['base_2_num']
+    base_sum = row['base_sum']
+    source_1_num = row['source_1_num']
+    source_2_num = row['source_2_num']
+    source_sum = row['source_sum']
+
+    if intervention_id == 7:
+        return source_1_num + base_2_num
+    elif intervention_id == 8:
+        return base_1_num + source_2_num
+    else:
+        return source_sum
+
 def get_counterfactual_sum_R1_3_digit(intervention_id, **row):
     '''
     Get the counterfactual sum for the given intervention id, base 1 number, base 2 digits, and source number.
@@ -167,6 +266,10 @@ def get_counterfactual_sum_R1_3_digit(intervention_id, **row):
     Returns:
         The counterfactual sum.
     '''
+
+    return row['source_sum']
+
+    # Need to edit the following to the new prompt
 
     # Get the base and source numbers
     base_1_num = row['base_1_num']
