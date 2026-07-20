@@ -12,6 +12,8 @@
 .python-version
 pyproject.toml
 uv.lock
+.env
+__pycache__/
 
 # personal
 notes.txt
@@ -20,14 +22,7 @@ src/test.ipynb
 old_output
 
 # not ready
-*.csv
-experiments/attention
-experiments/confidence
-experiments/DAS
-experiments/steering_vector
 old_output
 src/test.ipynb
 src/R1_test.ipynb
-.env
-__pycache__/
 *.py[cod]

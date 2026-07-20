@@ -873,3 +873,64 @@ def plot_intervention_effect_heatmap(directory, keyword):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_mock_intervention_effect_heatmap():
+    """
+    Plot a heatmap where the value for each (x, y) is fixed:
+      - For y <= 5: 0.21
+      - For 6 <= y <= 15: [0.21, 0.31, 0.5, 0.87, 0.91] mapped to columns (x)
+      - For y >= 16: 0
+    """
+    import matplotlib.pyplot as plt
+    x_values = list([0, 0.25, 0.5, 1, 2])
+    y_values = list(range(0, 24))
+    heatmap = np.full((len(y_values), len(x_values)), np.nan)
+
+    heat_seq = [0.21, 0.31, 0.5, 0.87, 0.91]
+    num_x = len(x_values)
+
+    for y in y_values:
+        if y <= 5:
+            for i in range(num_x):
+                heatmap[y, i] = 0.21
+        elif 6 <= y <= 15:
+            for i in range(num_x):
+                heatmap[y, i] = heat_seq[i]
+        elif y >= 16:
+            for i in range(num_x):
+                heatmap[y, i] = 0
+
+    fig, ax = plt.subplots(figsize=(14, 8))
+    im = ax.imshow(
+        heatmap, aspect='auto', origin='lower', cmap='viridis',
+        extent=[-4-0.5, 4+0.5, 0-0.5, 24+0.5]
+    )
+
+    # Calculate locations for label centers, given how imshow maps grid to axis:
+    # With extent=[left, right, bottom, top], columns are spaced evenly from left to right.
+    left, right = -4-0.5, 4+0.5
+    col_centers = [
+        left + (right - left) * (i + 0.5) / len(x_values)
+        for i in range(len(x_values))
+    ]
+
+    ax.set_xticks(col_centers)
+    ax.set_xticklabels(x_values)
+    ax.set_yticks(y_values)
+    ax.set_xlabel('Steering Coefficient (x)', fontsize=16)
+    ax.set_ylabel('Layer (y)', fontsize=16)
+    ax.set_title('Heatmap of Counterfactual Ratio by Steering Coefficient (x) and Layer (y)', fontsize=18)
+
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label("Counterfactual Ratio", fontsize=15)
+
+    # FIX: Place annotation at the computed col_centers for each i
+    for y in y_values:
+        for i in range(len(x_values)):
+            val = heatmap[y, i]
+            if not np.isnan(val):
+                ax.text(col_centers[i], y, f"{val:.2f}", ha='center', va='center', color='w', fontsize=10)
+
+    plt.tight_layout()
+    plt.show()

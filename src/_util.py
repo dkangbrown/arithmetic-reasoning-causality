@@ -3,8 +3,40 @@ import torch
 from transformers import Mxfp4Config, AutoModelForCausalLM, AutoTokenizer
 import csv
 import re
+import pynvml
 
-def load_OSS(model_id="openai/gpt-oss-20b", path="/users/dkang33/scratch/model_cache", device="auto"):
+def gpu_memory_used_mb(device_index: int) -> float:
+    """
+    Return the driver-level GPU memory used (in MiB) for the given device,
+    matching what gpustat / nvidia-smi report.
+    """
+    pynvml.nvmlInit()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+    info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    return info.used / 1024 ** 2
+
+def device_by_allocated_memory():
+    """
+    Find the device with the least allocated memory, using driver-level usage
+    (matches gpustat / nvidia-smi).
+    """
+    if torch.cuda.is_available():
+        device_allocations = []
+        for i in range(torch.cuda.device_count()):
+            used_mb = gpu_memory_used_mb(i)
+            device_allocations.append((f'cuda:{i}', used_mb))
+
+        sorted_devices = sorted(device_allocations, key=lambda x: x[1])
+        return [device for device, _ in sorted_devices]
+    else:
+        return ['cpu']
+
+def load_OSS(model_id="openai/gpt-oss-20b", path="/nas/ucb/daniel_d_kang/huggingface/cache", device=None):
+    if device is None:
+        # print(device_by_allocated_memory())
+        # device = device_by_allocated_memory()[0]
+        device = "auto"
+    print(f"Loading OSS model on device: {device}")
     quantization_config = Mxfp4Config(dequantize=True)
     model_kwargs = dict(
         attn_implementation="eager",
@@ -12,6 +44,7 @@ def load_OSS(model_id="openai/gpt-oss-20b", path="/users/dkang33/scratch/model_c
         quantization_config=quantization_config,
         use_cache=False,
         device_map=device,
+        max_memory={int(device_by_allocated_memory()[0][-1]): "30GiB", int(device_by_allocated_memory()[1][-1]): "30GiB"},
         cache_dir=path,
     )
 
@@ -40,6 +73,7 @@ def create_csv_file(dir, filename, header, overwrite=False):
     Returns:
         The filepath of the created file.
     '''
+    os.makedirs(dir, exist_ok=True)
     filepath = os.path.join(dir, filename)
     
     if not overwrite:

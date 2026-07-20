@@ -1,5 +1,10 @@
+"""
+Helper functions related to creating datasets in create_dataset_csv.ipynb.
+"""
+
 import random
 random.seed(42)
+import pandas as pd
 import _prompt
 
 def create_dataset(num_digits=3, num_samples=128):
@@ -257,3 +262,97 @@ def create_c_dataset(num_digits=3, num_samples=256):
         })
 
     return add_ds
+
+
+def create_prompt_dataframe(add_ds, get_prompt_fn, divide_num=100):
+    prompt_data = []
+
+    for add_ds_entry in add_ds:
+        base_1_digits = add_ds_entry["base_1_digits"]
+        base_2_digits = add_ds_entry["base_2_digits"]
+        base_1_num = add_ds_entry["base_1_num"]
+        base_2_num = add_ds_entry["base_2_num"]
+        base_sum = add_ds_entry["base_sum"]
+        source_1_digits = add_ds_entry["source_1_digits"]
+        source_2_digits = add_ds_entry["source_2_digits"]
+        source_1_num = add_ds_entry["source_1_num"]
+        source_2_num = add_ds_entry["source_2_num"]
+        source_sum = add_ds_entry["source_sum"]
+
+        base_prompt = get_prompt_fn(base_1_digits, base_2_digits, base_1_num, base_2_num)
+        truncated_base_prompt, factual_output, _ = _prompt.divide_prompt(divide_num, base_prompt)
+        source_prompt = get_prompt_fn(source_1_digits, source_2_digits, source_1_num, source_2_num)
+        truncated_source_prompt, counterfactual_output, _ = _prompt.divide_prompt(divide_num, source_prompt)
+
+        prompt_data.append({
+            "base_1_digits": base_1_digits,
+            "base_2_digits": base_2_digits,
+            "base_1_num": base_1_num,
+            "base_2_num": base_2_num,
+            "base_sum": base_sum,
+            "source_1_digits": source_1_digits,
+            "source_2_digits": source_2_digits,
+            "source_1_num": source_1_num,
+            "source_2_num": source_2_num,
+            "source_sum": source_sum,
+            "base_prompt": truncated_base_prompt,
+            "source_prompt": truncated_source_prompt,
+            "factual_output": factual_output,
+            "counterfactual_output": counterfactual_output,
+        })
+
+    return pd.DataFrame(prompt_data)
+
+
+def divide_prompts(
+    prompt_data,
+    intervention_ids_dict,
+    get_counterfactual_sum_fn,
+):
+    divided_prompts = []
+
+    for _, row in prompt_data.iterrows():
+        base_prompt = row["base_prompt"]
+        source_prompt = row["source_prompt"]
+        counterfactual_row = row.to_dict()
+        for digit_column in (
+            "base_1_digits",
+            "base_2_digits",
+            "source_1_digits",
+            "source_2_digits",
+        ):
+            if isinstance(counterfactual_row.get(digit_column), list):
+                counterfactual_row[digit_column] = repr(counterfactual_row[digit_column])
+
+        for intervention_id in intervention_ids_dict["all"]:
+            base_before, base_number, base_after = _prompt.divide_prompt(intervention_id, base_prompt)
+            source_before, source_number, source_after = _prompt.divide_prompt(intervention_id, source_prompt)
+            if base_after == "" or source_after == "":
+                break
+            counterfactual_sum = get_counterfactual_sum_fn(intervention_id, **counterfactual_row)
+
+            divided_prompts.append({
+                "base_1_digits": row["base_1_digits"],
+                "base_2_digits": row["base_2_digits"],
+                "base_1_num": row["base_1_num"],
+                "base_2_num": row["base_2_num"],
+                "base_sum": row["base_sum"],
+                "source_1_digits": row["source_1_digits"],
+                "source_2_digits": row["source_2_digits"],
+                "source_1_num": row["source_1_num"],
+                "source_2_num": row["source_2_num"],
+                "source_sum": row["source_sum"],
+                "intervention_id": intervention_id,
+                "base_before": base_before,
+                "base_number": base_number,
+                "base_after": base_after,
+                "source_before": source_before,
+                "source_number": source_number,
+                "source_after": source_after,
+                "counterfactual_sum": counterfactual_sum,
+                "in_restatement": intervention_id in intervention_ids_dict["restatement"],
+                "in_reasoning": intervention_id in intervention_ids_dict["reasoning"],
+                "in_result": intervention_id in intervention_ids_dict["result"],
+            })
+
+    return pd.DataFrame(divided_prompts)
